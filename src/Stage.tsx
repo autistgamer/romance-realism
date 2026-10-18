@@ -1,11 +1,9 @@
-import React, {useEffect, useMemo, useRef, useState, type ReactElement} from "react";
+import React, {type ReactElement} from "react";
 import {createPortal} from "react-dom";
 import {StageBase, type StageResponse, type InitialData, type Message} from "@chub-ai/stages-ts";
 import type {LoadResponse} from "@chub-ai/stages-ts/dist/types/load";
 import {DEFAULT_CONFIG, normalizeConfig, NormalizedConfig, type ConfigSchema} from "./config_schema";
 import {
-    detectConsentIssues,
-    detectDrift,
     detectEscalationSignals,
     detectMemoryEvents,
     detectTabooAwareness,
@@ -16,13 +14,11 @@ import {
     evaluateProximityTransition,
     extractEmotionSnapshot,
     recallMemoryScar,
-    scoreUnresolvedBeatReminder,
     scoreSilenceOrPause,
     scoreSubtext,
     summarizeScene,
     updateSceneFromMessage,
     type EmotionSnapshot,
-    type PhaseHistoryEntry,
     type Proximity,
     type ProximityHistoryEntry,
     type SceneState,
