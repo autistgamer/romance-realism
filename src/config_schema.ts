@@ -1,6 +1,7 @@
 /**
- * Config schema and normalization utilities for the Romance Realism Pack.
+ * Config schema and normalization utilities for the Incest Slow-Burn Realism Pack.
  * Ensures null-safety, default fallbacks, and range clamping for numeric fields.
+ * Specialized from the original Romance Realism Pack for taboo-aware family dynamics.
  */
 
 export type ConfigSchema = {
@@ -14,8 +15,6 @@ export type ConfigSchema = {
     ui_max_notes?: number; // 1..50
     ui_show_status?: boolean | number;
     ui_show_timestamps?: boolean | number;
-    // Note quota (applies to non-critical guidance; affects UI + prompt injection).
-    // Prefer `max_notes_per_20`; `max_ui_notes_per_20` is kept for backwards compatibility.
     max_notes_per_20?: number; // -1 disables override, otherwise 0..20
     max_ui_notes_per_20?: number; // deprecated alias of `max_notes_per_20`
 
@@ -34,10 +33,10 @@ export type ConfigSchema = {
     note_unresolved_beats?: boolean | number;
     unresolved_beats_max_history?: number; // 0..20
     unresolved_beats_snippet_max_chars?: number; // 40..240
-    tune_unresolved_beat_score_threshold?: number; // null/undefined -> strictness defaults, otherwise 1..20
-    tune_unresolved_beat_cooldown_turns?: number; // null/undefined -> strictness defaults, otherwise 0..50
+    tune_unresolved_beat_score_threshold?: number;
+    tune_unresolved_beat_cooldown_turns?: number;
 
-    // Note toggles
+    // Note toggles (original)
     note_scene_summary?: boolean | number;
     note_emotion_delta?: boolean | number;
     note_phase?: boolean | number;
@@ -48,15 +47,22 @@ export type ConfigSchema = {
     note_drift?: boolean | number;
     note_scar_recall?: boolean | number;
 
-    // Tuning overrides (null/undefined uses strictness defaults)
-    tune_phase_weight_threshold?: number; // null/undefined -> strictness defaults, otherwise 1..20
-    tune_delta_score_threshold?: number; // null/undefined -> strictness defaults, otherwise 0..20
-    tune_ui_note_parts?: number; // null/undefined -> strictness defaults, otherwise 1..6
+    // Note toggles (incest / taboo extensions)
+    note_taboo_awareness?: boolean | number;
+    note_guilt_shame?: boolean | number;
+    note_role_bleed?: boolean | number;
+    note_secrecy?: boolean | number;
 
-    // Lexicon tuning (optional). These let you expand coverage without changing code.
-    // - `tune_emotion_extra`: add extra keywords/short phrases per tone (negation-aware).
-    // - `tune_scene_location_place_heads`: add extra location "head nouns" (e.g. "gazebo", "atrium").
-    // - `tune_scene_location_stopwords`: add extra location stopwords (e.g. "thoughts", "silence").
+    // Taboo-specific controls
+    strict_taboo_pacing?: boolean | number;
+    power_imbalance_sensitivity?: number; // 1..3
+
+    // Tuning overrides
+    tune_phase_weight_threshold?: number;
+    tune_delta_score_threshold?: number;
+    tune_ui_note_parts?: number;
+
+    // Lexicon tuning
     tune_emotion_extra?: Record<string, string[]>;
     tune_scene_location_place_heads?: string[];
     tune_scene_location_stopwords?: string[];
@@ -64,16 +70,7 @@ export type ConfigSchema = {
     [key: string]: unknown;
 };
 
-export type NormalizedConfig = Omit<ConfigSchema, 'enabled' | 'strictness' | 'memory_depth'
-    | 'ui_enabled' | 'ui_max_notes' | 'ui_show_status' | 'ui_show_timestamps' | 'max_notes_per_20' | 'max_ui_notes_per_20'
-    | 'ui_debug_scoring' | 'ui_debug_max_candidates'
-    | 'prompt_injection_enabled' | 'prompt_injection_include_scene' | 'prompt_injection_max_parts' | 'prompt_injection_max_chars'
-    | 'scene_unresolved_beats_enabled' | 'note_unresolved_beats' | 'unresolved_beats_max_history' | 'unresolved_beats_snippet_max_chars'
-    | 'tune_unresolved_beat_score_threshold' | 'tune_unresolved_beat_cooldown_turns'
-    | 'tune_phase_weight_threshold' | 'tune_delta_score_threshold' | 'tune_ui_note_parts'
-    | 'tune_emotion_extra' | 'tune_scene_location_place_heads' | 'tune_scene_location_stopwords'
-    | 'note_scene_summary' | 'note_emotion_delta' | 'note_phase' | 'note_proximity' | 'note_consent'
-    | 'note_subtext' | 'note_silence' | 'note_drift' | 'note_scar_recall'> & {
+export type NormalizedConfig = {
     enabled: boolean;
     strictness: number;
     memory_depth: number;
@@ -108,6 +105,14 @@ export type NormalizedConfig = Omit<ConfigSchema, 'enabled' | 'strictness' | 'me
     note_drift: boolean;
     note_scar_recall: boolean;
 
+    note_taboo_awareness: boolean;
+    note_guilt_shame: boolean;
+    note_role_bleed: boolean;
+    note_secrecy: boolean;
+
+    strict_taboo_pacing: boolean;
+    power_imbalance_sensitivity: number;
+
     tune_phase_weight_threshold: number | null;
     tune_delta_score_threshold: number | null;
     tune_ui_note_parts: number | null;
@@ -115,6 +120,7 @@ export type NormalizedConfig = Omit<ConfigSchema, 'enabled' | 'strictness' | 'me
     tune_emotion_extra: Record<string, string[]>;
     tune_scene_location_place_heads: string[];
     tune_scene_location_stopwords: string[];
+    [key: string]: unknown;
 };
 
 export const DEFAULT_CONFIG: NormalizedConfig = {
@@ -150,6 +156,14 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     note_silence: true,
     note_drift: true,
     note_scar_recall: true,
+
+    note_taboo_awareness: true,
+    note_guilt_shame: true,
+    note_role_bleed: true,
+    note_secrecy: true,
+
+    strict_taboo_pacing: true,
+    power_imbalance_sensitivity: 2,
 
     tune_phase_weight_threshold: null,
     tune_delta_score_threshold: null,
@@ -206,11 +220,6 @@ function normalizeStringRecordOfArrays(v: unknown, opts?: {maxKeys?: number; max
     return out;
 }
 
-/**
- * Normalize a possibly-partial or null config object into a fully-populated, safe config.
- * - Treats missing or null fields as absent and substitutes defaults.
- * - Clamps `strictness` to [1,3] and `memory_depth` to [5,30].
- */
 export function normalizeConfig(cfg?: ConfigSchema | null): NormalizedConfig {
     const src = cfg || {};
     const enabled = typeof src.enabled === 'boolean' ? src.enabled : DEFAULT_CONFIG.enabled;
@@ -274,6 +283,16 @@ export function normalizeConfig(cfg?: ConfigSchema | null): NormalizedConfig {
     const note_drift = asBool(src.note_drift, DEFAULT_CONFIG.note_drift);
     const note_scar_recall = asBool(src.note_scar_recall, DEFAULT_CONFIG.note_scar_recall);
 
+    const note_taboo_awareness = asBool(src.note_taboo_awareness, DEFAULT_CONFIG.note_taboo_awareness);
+    const note_guilt_shame = asBool(src.note_guilt_shame, DEFAULT_CONFIG.note_guilt_shame);
+    const note_role_bleed = asBool(src.note_role_bleed, DEFAULT_CONFIG.note_role_bleed);
+    const note_secrecy = asBool(src.note_secrecy, DEFAULT_CONFIG.note_secrecy);
+
+    const strict_taboo_pacing = asBool(src.strict_taboo_pacing, DEFAULT_CONFIG.strict_taboo_pacing);
+    const power_imbalance_sensitivity = (typeof src.power_imbalance_sensitivity === 'number')
+        ? clamp(Math.floor(src.power_imbalance_sensitivity), 1, 3)
+        : DEFAULT_CONFIG.power_imbalance_sensitivity;
+
     const tune_phase_weight_threshold = (typeof src.tune_phase_weight_threshold === 'number' && Number.isFinite(src.tune_phase_weight_threshold))
         ? clamp(Math.floor(src.tune_phase_weight_threshold), 1, 20)
         : DEFAULT_CONFIG.tune_phase_weight_threshold;
@@ -322,6 +341,14 @@ export function normalizeConfig(cfg?: ConfigSchema | null): NormalizedConfig {
         note_drift,
         note_scar_recall,
 
+        note_taboo_awareness,
+        note_guilt_shame,
+        note_role_bleed,
+        note_secrecy,
+
+        strict_taboo_pacing,
+        power_imbalance_sensitivity,
+
         tune_phase_weight_threshold,
         tune_delta_score_threshold,
         tune_ui_note_parts,
@@ -329,73 +356,17 @@ export function normalizeConfig(cfg?: ConfigSchema | null): NormalizedConfig {
         tune_emotion_extra,
         tune_scene_location_place_heads,
         tune_scene_location_stopwords,
-        // preserve unknown keys but do not trust their types
-        ...Object.keys(src).reduce((acc: Record<string, unknown>, k) => {
-            if (![
-                'enabled', 'strictness', 'memory_depth',
-                'ui_enabled', 'ui_max_notes', 'ui_show_status', 'ui_show_timestamps', 'max_notes_per_20', 'max_ui_notes_per_20',
-                'ui_debug_scoring', 'ui_debug_max_candidates',
-                'prompt_injection_enabled', 'prompt_injection_include_scene', 'prompt_injection_max_parts', 'prompt_injection_max_chars',
-                'scene_unresolved_beats_enabled', 'note_unresolved_beats', 'unresolved_beats_max_history', 'unresolved_beats_snippet_max_chars',
-                'tune_unresolved_beat_score_threshold', 'tune_unresolved_beat_cooldown_turns',
-                'note_scene_summary', 'note_emotion_delta', 'note_phase', 'note_proximity', 'note_consent',
-                'note_subtext', 'note_silence', 'note_drift', 'note_scar_recall',
-                'tune_phase_weight_threshold', 'tune_delta_score_threshold', 'tune_ui_note_parts',
-                'tune_emotion_extra', 'tune_scene_location_place_heads', 'tune_scene_location_stopwords',
-            ].includes(k)) {
-                acc[k] = (src as any)[k];
-            }
-            return acc;
-        }, {}),
     };
 }
 
-/**
- * Lightweight validator that returns an array of human-readable errors (empty when valid).
- */
 export function validateConfig(cfg?: ConfigSchema | null): string[] {
     const errors: string[] = [];
     if (cfg == null) return errors;
     if (cfg.enabled != null && typeof cfg.enabled !== 'boolean') errors.push('`enabled` must be a boolean.');
     if (cfg.strictness != null && (typeof cfg.strictness !== 'number' || !Number.isFinite(cfg.strictness))) errors.push('`strictness` must be a number.');
     if (cfg.memory_depth != null && (typeof cfg.memory_depth !== 'number' || !Number.isFinite(cfg.memory_depth))) errors.push('`memory_depth` must be a number.');
-    if (cfg.ui_enabled != null && !(typeof cfg.ui_enabled === 'boolean' || typeof cfg.ui_enabled === 'number')) errors.push('`ui_enabled` must be a boolean (or 0/1).');
-    if (cfg.ui_max_notes != null && (typeof cfg.ui_max_notes !== 'number' || !Number.isFinite(cfg.ui_max_notes))) errors.push('`ui_max_notes` must be a number.');
-    if (cfg.ui_show_status != null && !(typeof cfg.ui_show_status === 'boolean' || typeof cfg.ui_show_status === 'number')) errors.push('`ui_show_status` must be a boolean (or 0/1).');
-    if (cfg.ui_show_timestamps != null && !(typeof cfg.ui_show_timestamps === 'boolean' || typeof cfg.ui_show_timestamps === 'number')) errors.push('`ui_show_timestamps` must be a boolean (or 0/1).');
-    if (cfg.max_notes_per_20 != null && (typeof cfg.max_notes_per_20 !== 'number' || !Number.isFinite(cfg.max_notes_per_20))) errors.push('`max_notes_per_20` must be a number.');
-    if (cfg.max_ui_notes_per_20 != null && (typeof cfg.max_ui_notes_per_20 !== 'number' || !Number.isFinite(cfg.max_ui_notes_per_20))) errors.push('`max_ui_notes_per_20` must be a number.');
-    if (cfg.ui_debug_scoring != null && !(typeof cfg.ui_debug_scoring === 'boolean' || typeof cfg.ui_debug_scoring === 'number')) errors.push('`ui_debug_scoring` must be a boolean (or 0/1).');
-    if (cfg.ui_debug_max_candidates != null && (typeof cfg.ui_debug_max_candidates !== 'number' || !Number.isFinite(cfg.ui_debug_max_candidates))) errors.push('`ui_debug_max_candidates` must be a number.');
-    if (cfg.prompt_injection_enabled != null && !(typeof cfg.prompt_injection_enabled === 'boolean' || typeof cfg.prompt_injection_enabled === 'number')) errors.push('`prompt_injection_enabled` must be a boolean (or 0/1).');
-    if (cfg.prompt_injection_include_scene != null && !(typeof cfg.prompt_injection_include_scene === 'boolean' || typeof cfg.prompt_injection_include_scene === 'number')) errors.push('`prompt_injection_include_scene` must be a boolean (or 0/1).');
-    if (cfg.prompt_injection_max_parts != null && (typeof cfg.prompt_injection_max_parts !== 'number' || !Number.isFinite(cfg.prompt_injection_max_parts))) errors.push('`prompt_injection_max_parts` must be a number.');
-    if (cfg.prompt_injection_max_chars != null && (typeof cfg.prompt_injection_max_chars !== 'number' || !Number.isFinite(cfg.prompt_injection_max_chars))) errors.push('`prompt_injection_max_chars` must be a number.');
-    if (cfg.scene_unresolved_beats_enabled != null && !(typeof cfg.scene_unresolved_beats_enabled === 'boolean' || typeof cfg.scene_unresolved_beats_enabled === 'number')) errors.push('`scene_unresolved_beats_enabled` must be a boolean (or 0/1).');
-    if (cfg.note_unresolved_beats != null && !(typeof cfg.note_unresolved_beats === 'boolean' || typeof cfg.note_unresolved_beats === 'number')) errors.push('`note_unresolved_beats` must be a boolean (or 0/1).');
-    if (cfg.unresolved_beats_max_history != null && (typeof cfg.unresolved_beats_max_history !== 'number' || !Number.isFinite(cfg.unresolved_beats_max_history))) errors.push('`unresolved_beats_max_history` must be a number.');
-    if (cfg.unresolved_beats_snippet_max_chars != null && (typeof cfg.unresolved_beats_snippet_max_chars !== 'number' || !Number.isFinite(cfg.unresolved_beats_snippet_max_chars))) errors.push('`unresolved_beats_snippet_max_chars` must be a number.');
-    if (cfg.tune_unresolved_beat_score_threshold != null && (typeof cfg.tune_unresolved_beat_score_threshold !== 'number' || !Number.isFinite(cfg.tune_unresolved_beat_score_threshold))) errors.push('`tune_unresolved_beat_score_threshold` must be a number.');
-    if (cfg.tune_unresolved_beat_cooldown_turns != null && (typeof cfg.tune_unresolved_beat_cooldown_turns !== 'number' || !Number.isFinite(cfg.tune_unresolved_beat_cooldown_turns))) errors.push('`tune_unresolved_beat_cooldown_turns` must be a number.');
-    if (cfg.tune_phase_weight_threshold != null && (typeof cfg.tune_phase_weight_threshold !== 'number' || !Number.isFinite(cfg.tune_phase_weight_threshold))) errors.push('`tune_phase_weight_threshold` must be a number.');
-    if (cfg.tune_delta_score_threshold != null && (typeof cfg.tune_delta_score_threshold !== 'number' || !Number.isFinite(cfg.tune_delta_score_threshold))) errors.push('`tune_delta_score_threshold` must be a number.');
-    if (cfg.tune_ui_note_parts != null && (typeof cfg.tune_ui_note_parts !== 'number' || !Number.isFinite(cfg.tune_ui_note_parts))) errors.push('`tune_ui_note_parts` must be a number.');
-    if (cfg.tune_emotion_extra != null && (typeof cfg.tune_emotion_extra !== 'object' || Array.isArray(cfg.tune_emotion_extra))) errors.push('`tune_emotion_extra` must be an object mapping tone -> string[].');
-    if (cfg.tune_scene_location_place_heads != null && !Array.isArray(cfg.tune_scene_location_place_heads)) errors.push('`tune_scene_location_place_heads` must be an array of strings.');
-    if (cfg.tune_scene_location_stopwords != null && !Array.isArray(cfg.tune_scene_location_stopwords)) errors.push('`tune_scene_location_stopwords` must be an array of strings.');
-
-    for (const k of [
-        'note_scene_summary', 'note_emotion_delta', 'note_phase', 'note_proximity', 'note_consent',
-        'note_subtext', 'note_silence', 'note_drift', 'note_scar_recall',
-    ] as const) {
-        const v = (cfg as any)[k];
-        if (v != null && !(typeof v === 'boolean' || typeof v === 'number')) errors.push(`\`${k}\` must be a boolean (or 0/1).`);
+    if (cfg.power_imbalance_sensitivity != null && (typeof cfg.power_imbalance_sensitivity !== 'number' || !Number.isFinite(cfg.power_imbalance_sensitivity))) {
+        errors.push('`power_imbalance_sensitivity` must be a number (1-3).');
     }
     return errors;
 }
-
-export default {
-    DEFAULT_CONFIG,
-    normalizeConfig,
-    validateConfig,
-};
