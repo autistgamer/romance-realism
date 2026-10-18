@@ -3,7 +3,7 @@ name: Deploy Built Stage
 on:
   push:
     branches:
-      - main  # Or any branch you use for releases
+      - main
       - master
     tags:
       - 'v*'
@@ -32,6 +32,9 @@ jobs:
              echo "Your CHUB_AUTH_TOKEN secret is not set for this project. Cannot proceed."
              exit 1
           fi
+          # Length only (never print the token)
+          TOKEN_LEN=$(printf %s "${{ secrets.CHUB_AUTH_TOKEN }}" | wc -c | tr -d ' ')
+          echo "CHUB_AUTH_TOKEN is set (length=${TOKEN_LEN})."
 
       - name: Get or Make Stage ID
         if: ${{ !contains(github.repository, 'template') }}
@@ -39,8 +42,8 @@ jobs:
           CHUB_AUTH_TOKEN: ${{ secrets.CHUB_AUTH_TOKEN }}
           STAGE_ID: ${{ secrets.STAGE_ID }}
         run: |
-          mkdir -p public/       
-          touch public/chub_meta.yaml  
+          mkdir -p public/
+          touch public/chub_meta.yaml
           if grep -q "^github_path:" public/chub_meta.yaml; then
             echo "Repo path already in metadata file."
           else
@@ -64,14 +67,29 @@ jobs:
                   echo "Not making ext id for template project"
                   STAGE_ID="extension-template-5523da8cf7de"
                 else
-                  echo "Extension ID not present in public/chub_meta.yaml extension_id field either. Creating new project."
+                  echo "Extension ID not present in public/chub_meta.yaml. Creating new project."
                   sudo apt-get update
                   sudo apt-get install -y jq
                   STAGE_ID=""
-                  curl -H "CH-API-KEY: ${{ secrets.CHUB_AUTH_TOKEN }}" -H "Content-Type: application/json" --request POST --data '{"name":"${{ github.event.repository.name }}"}'  https://api.chub.ai/extensions  -o creation.json
-                  STAGE_ID=$(jq -r '.id_v2' creation.json)
+                  HTTP_CODE=$(curl -sS -o creation.json -w "%{http_code}" \
+                    -H "CH-API-KEY: ${{ secrets.CHUB_AUTH_TOKEN }}" \
+                    -H "Content-Type: application/json" \
+                    --request POST \
+                    --data '{"name":"${{ github.event.repository.name }}"}' \
+                    https://api.chub.ai/extensions)
+                  echo "Chub API HTTP status: ${HTTP_CODE}"
+                  echo "Chub API raw response:"
+                  cat creation.json || true
+                  echo
+                  if ! jq -e . creation.json >/dev/null 2>&1; then
+                    echo "Response is not valid JSON. Token is likely invalid, expired, read-only, or not a stages write token."
+                    echo "Get a WRITE token at https://chub.ai/my_stages?active=tokens and update the CHUB_AUTH_TOKEN secret."
+                    exit 1
+                  fi
+                  STAGE_ID=$(jq -r '.id_v2 // .id // empty' creation.json)
                   if [ "${STAGE_ID}" == "" ] || [ "${STAGE_ID}" == "null" ]; then
-                    echo "Extension ID creation failed; is your CHUB_AUTH_TOKEN secret set for this project?"
+                    echo "Extension ID creation failed; response did not include id_v2."
+                    echo "Is your CHUB_AUTH_TOKEN a valid WRITE token from https://chub.ai/my_stages?active=tokens ?"
                     exit 1
                   fi
                   echo -e "\nextension_id: '${STAGE_ID}'\n" >> public/chub_meta.yaml
@@ -88,12 +106,14 @@ jobs:
              STAGE_ID=${{ secrets.STAGE_ID }}
           fi
           echo "STAGE_ID=${STAGE_ID}" >> $GITHUB_ENV
+
       - name: Char UUIDGen
         if: ${{ !contains(github.repository, 'template') }}
         run: |
           sudo apt-get update
           sudo apt-get install -y uuid-runtime
           for file in public/characters/*.yaml; do
+            if [ ! -f "$file" ]; then continue; fi
             if grep -q 'project_uuid:' "$file"; then
               echo "project has uuid."
             else
@@ -107,6 +127,7 @@ jobs:
               git push
             fi
           done
+
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
@@ -120,7 +141,7 @@ jobs:
         if: ${{ !contains(github.repository, 'template') }}
         env:
           CHUB_AUTH_TOKEN: ${{ secrets.CHUB_AUTH_TOKEN }}
-        run: |    
+        run: |
           curl -H "CH-API-KEY: ${{ secrets.CHUB_AUTH_TOKEN }}" -F "file=@build.zip" https://api.chub.ai/extension/${{ env.STAGE_ID }}/upload
 
       - name: Setup .npmrc
@@ -136,7 +157,6 @@ jobs:
         id: get_version
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-        # Assumes tag is of form v1.0.0, strips the 'v'
 
       - name: Update package.json version
         run: yarn build --mode lib && yarn verify:lib-dist && yarn version --new-version ${{ steps.get_version.outputs.VERSION }} --no-git-tag-version && yarn publish --access public
