@@ -2,10 +2,10 @@
 #   in which case these values can be managed in the UI.
 
 # The name of the stage.
-project_name: "Romance Realism Pack"
+project_name: "Incest Slow-Burn Realism"
 
 # A short tagline to show in search.
-tagline: "Invisible guardrails for slow-burn romance RP"
+tagline: "Invisible guardrails for taboo-aware slow-burn family roleplay"
 
 # 'PUBLIC', 'PRIVATE', or 'UNLISTED'.
 visibility: 'PUBLIC'
@@ -19,6 +19,9 @@ tags:
   - 'romance'
   - 'realism'
   - 'slow-burn'
+  - 'incest'
+  - 'taboo'
+  - 'family'
   - 'roleplay'
 
 # The schema of any user-supplied config.
@@ -206,6 +209,42 @@ config_schema:
       maximum: 1
       default: 1
       description: "Occasionally recall the most recent memory scar as a continuity nudge."
+    note_taboo_awareness:
+      type: integer
+      minimum: 0
+      maximum: 1
+      default: 1
+      description: "Detect and note taboo recognition, guilt, denial, and 'this is wrong' language."
+    note_guilt_shame:
+      type: integer
+      minimum: 0
+      maximum: 1
+      default: 1
+      description: "Surface guilt/shame spikes and rationalization patterns."
+    note_role_bleed:
+      type: integer
+      minimum: 0
+      maximum: 1
+      default: 1
+      description: "Flag mixing of familial role language with romantic/sexual framing."
+    note_secrecy:
+      type: integer
+      minimum: 0
+      maximum: 1
+      default: 1
+      description: "Track secrecy, fear of discovery, and risk language."
+    strict_taboo_pacing:
+      type: integer
+      minimum: 0
+      maximum: 1
+      default: 1
+      description: "Raise phase advancement thresholds and prefer slower progression through taboo stages."
+    power_imbalance_sensitivity:
+      type: integer
+      minimum: 1
+      maximum: 3
+      default: 2
+      description: "Amplify consent/agency flags when parental or authority language appears (1=light, 3=strict)."
     tune_phase_weight_threshold:
       anyOf:
         - type: integer
@@ -233,9 +272,6 @@ config_schema:
   additionalProperties: true
 
 # The schema of the state that you store.
-# This isn't needed even if you do store state,
-#   and is here more for future use cases to
-#   optimize storage.
 state_schema:
   init:
     type: object
@@ -245,22 +281,5 @@ state_schema:
     type: object
   additionalProperties: true
 
-# Whether to publish as 'Anonymous' instead of under your username.
-# is_anonymous: false
-
-# Self-explanatory.
-# ratings_disabled: false
-
-# This is here for future cases where ex. you need user secrets,
-#    but currently does nothing.
-# permissions:
-
-# extension_id is automatically generated on push with a new project;
-#    you should not make or set this value.
-# github_path will be added if it does not exist. It is the URL of the repo.
-
-
-github_path: 'https://github.com/MaeveOfFae/romance-realism'
-
-
-extension_id: 'romance-realism-a24837dc9da4'
+# github_path will be updated by the platform if needed.
+github_path: 'https://github.com/autistgamer/romance-realism'
