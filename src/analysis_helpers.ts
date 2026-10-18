@@ -43,11 +43,6 @@ function compileLooseTermsRegex(terms: string[] | null | undefined): RegExp | nu
     return new RegExp(`(?:${parts.join("|")})`, "i");
 }
 
-function stripQuotedDialogue(text: string): string {
-    if (!text) return "";
-    return text.replace(/"[^"]*"/g, " ");
-}
-
 function pushWeighted(hits: WeightedHit[], label: string, weight: number) {
     hits.push({label, weight});
 }
@@ -399,7 +394,6 @@ export function detectSecrecy(content: string): {notes: string[]; score: number;
     return {notes: Array.from(notes), score: sumWeights(reasons), reasons};
 }
 
-// Stubs for remaining original helpers so Stage compiles. Full bodies retained in upstream history.
 export function detectDrift(_p: any): string | null { return null; }
 export function scoreSilenceOrPause(content: string): {note: string | null; score: number; reasons: WeightedHit[]} {
     if (content == null) return {note: null, score: 0, reasons: []};
