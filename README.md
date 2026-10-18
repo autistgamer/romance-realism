@@ -1,7 +1,7 @@
 # Incest Slow-Burn Realism
 
 Invisible, background guardrails for **taboo-aware slow-burn family roleplay**.  
-Forked and specialized from [MaeveOfFae/romance-realism](https://github.com/MaeveOfFae/romance-realism).
+Forked and specialized from [MaeveOfFae/romance-realism](https://github.com/MaeveOfFae/romance-realism).Generated code with Grok.
 
 Runs beside the chat, shows concise notes in the stage UI, and can optionally inject one-shot guidance into the next system prompt (never into the transcript).
 
